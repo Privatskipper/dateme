@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>DateMe — Eine kleine Frage 💌</title>
+
+<!-- ============ PWA META ============ -->
+<meta name="theme-color" content="#e94e77">
+<meta name="description" content="Erstelle hübsche, persönliche Date-Einladungen.">
+
+<!-- Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS-spezifische Tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DateMe">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-1: #fde8ec; --bg-2: #ffd6e0; --bg-3: #ffeaa7;
+    --ink: #4a2d3a; --rose: #e94e77; --rose-deep: #c9396a;
+    --cream: #fff8f3; --mint: #a8e6cf;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100vh; overflow-x: hidden; }
+  body {
+    font-family: 'Cormorant Garamond', serif;
+    background:
+      radial-gradient(circle at 20% 10%, var(--bg-3) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, var(--bg-2) 0%, transparent 50%),
+      linear-gradient(135deg, var(--bg-1) 0%, #ffe5ec 100%);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 2rem 1rem;
+    /* Safe Area für iPhone-Notch */
+    padding-top: max(2rem, env(safe-area-inset-top));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    position: relative;
+  }
+  .floating-heart {
+    position: fixed; font-size: 1.5rem; opacity: 0.4;
+    animation: float 8s ease-in-out infinite;
+    pointer-events: none; z-index: 0;
+  }
+  @keyframes float { 0%,100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-30px) rotate(5deg); } }
+
+  /* ===== Splash-Screen ===== */
+  #splash {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 10000;
+    animation: splashOut 0.6s ease 1.2s forwards;
+  }
+  @keyframes splashOut {
+    to { opacity: 0; visibility: hidden; }
+  }
+  #splash .splash-heart {
+    font-size: 5rem;
+    animation: heartBeat 1.2s ease-in-out infinite;
+  }
+  #splash .splash-name {
+    font-family: 'Caveat', cursive;
+    color: white;
+    font-size: 2.5rem;
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+  @keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+  }
+
+  /* ===== Install-Banner (iPhone) ===== */
+  #installBanner {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--cream);
+    border-top: 2px solid var(--rose);
+    padding: 1rem 1.2rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.1);
+    z-index: 9999;
+    display: none;
+    animation: slideUp 0.5s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
+  #installBanner.show { display: block; }
+  #installBanner p {
+    font-size: 0.95rem;
+    color: var(--ink);
+    margin-bottom: 0.6rem;
+    line-height: 1.4;
+  }
+  #installBanner strong {
+    font-family: 'Caveat', cursive;
+    color: var(--rose-deep);
+    font-size: 1.2rem;
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+  #installBanner .install-steps {
+    font-size: 0.85rem;
+    color: #6b4858;
+    margin-bottom: 0.8rem;
+    line-height: 1.5;
+  }
+  #installBanner .install-close {
+    background: none; border: none;
+    color: var(--rose-deep);
+    font-family: 'Caveat', cursive;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0.3rem 0.8rem;
+    border: 1.5px solid #f0d8e0;
+    border-radius: 999px;
+  }
+
+  /* EDITOR */
+  .editor {
+    background: var(--cream); border-radius: 28px; padding: 2.5rem 2rem;
+    max-width: 620px; width: 100%;
+    box-shadow: 0 20px 60px rgba(233, 78, 119, 0.18), 0 4px 12px rgba(0,0,0,0.06);
+    z-index: 1; animation: cardIn 0.7s cubic-bezier(.2,.9,.2,1.05) both;
+  }
+  .editor h2 { font-family: 'Caveat', cursive; font-size: 2.2rem; color: var(--rose-deep); margin-bottom: 0.3rem; text-align: center; }
+  .editor-sub { text-align: center; color: #8a6473; margin-bottom: 1.8rem; font-size: 1.05rem; }
+  .field { margin-bottom: 1.1rem; }
+  .field label { display: block; font-family: 'Caveat', cursive; color: var(--rose); font-size: 1.2rem; margin-bottom: 0.3rem; padding-left: 0.4rem; }
+  .field-hint { font-size: 0.85rem; color: #a07485; margin-top: 0.25rem; padding-left: 0.4rem; font-style: italic; }
+  .field input, .field textarea {
+    width: 100%; font-family: 'Cormorant Garamond', serif; font-size: 1.1rem;
+    color: var(--ink); background: white; border: 2px solid #f0d8e0;
+    border-radius: 14px; padding: 0.7rem 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s; resize: vertical;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--rose); box-shadow: 0 0 0 4px rgba(233, 78, 119, 0.12); }
+
+  .section-title {
+    font-family: 'Caveat', cursive; color: var(--rose-deep);
+    font-size: 1.6rem; margin: 1.8rem 0 0.3rem;
+    border-top: 1px dashed #e8c4cf; padding-top: 1.2rem;
+  }
+  .section-hint { color: #8a6473; font-size: 0.95rem; margin-bottom: 1rem; }
+
+  .proposal-edit {
+    background: white; border: 2px solid #f0d8e0; border-radius: 18px;
+    padding: 1rem 1rem 0.8rem; margin-bottom: 0.8rem; position: relative;
+  }
+  .proposal-edit .pe-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.7rem;
+  }
+  .proposal-edit .pe-num { font-family: 'Caveat', cursive; color: var(--rose); font-size: 1.3rem; font-weight: 700; }
+  .proposal-edit .pe-remove {
+    background: none; border: none; color: #c9396a;
+    font-size: 1.4rem; cursor: pointer; padding: 0 0.3rem; line-height: 1;
+  }
+  .proposal-edit .pe-remove:hover { color: #8a1e3e; }
+  .pe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .pe-grid input {
+    font-family: 'Cormorant Garamond', serif; font-size: 1rem;
+    color: var(--ink); background: #fff8f3; border: 1.5px solid #f4dde4;
+    border-radius: 10px; padding: 0.55rem 0.8rem; width: 100%;
+    transition: border-color 0.2s;
+  }
+  .pe-grid input:focus { outline: none; border-color: var(--rose); }
+  .pe-grid input.wide { grid-column: 1 / -1; }
+
+  .add-proposal {
+    width: 100%; background: white; color: var(--rose-deep);
+    border: 2px dashed var(--rose); border-radius: 14px;
+    padding: 0.7rem; font-family: 'Caveat', cursive;
+    font-size: 1.3rem; cursor: pointer; transition: background 0.2s;
+  }
+  .add-proposal:hover { background: #fff0f4; }
+
+  .editor-actions { margin-top: 1.8rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .editor-actions button { flex: 1; min-width: 140px; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--rose), var(--rose-deep));
+    color: white; border: none; padding: 0.9rem 1.2rem; border-radius: 999px;
+    font-family: 'Caveat', cursive; font-size: 1.4rem; font-weight: 700;
+    cursor: pointer; box-shadow: 0 8px 20px rgba(233, 78, 119, 0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(233, 78, 119, 0.45); }
+  .btn-secondary {
+    background: white; color: var(--rose-deep); border: 2px solid #f0d8e0;
+    padding: 0.9rem 1.2rem; border-radius: 999px;
+    font-family: 'Caveat', cursive; font-size: 1.4rem; font-weight: 700;
+    cursor: pointer; transition: background 0.2s, border-color 0.2s;
+  }
+  .btn-secondary:hover { background: #fff0f4; border-color: var(--rose); }
+  .link-box {
+    margin-top: 1.5rem; background: #fff0f4; border: 2px dashed var(--rose);
+    border-radius: 14px; padding: 1rem; display: none;
+  }
+  .link-box.show { display: block; }
+  .link-box p { font-family: 'Caveat', cursive; color: var(--rose-deep); font-size: 1.15rem; margin-bottom: 0.5rem; }
+  .link-box textarea {
+    width: 100%; min-height: 80px; border: 1px solid #f0d8e0;
+    border-radius: 8px; padding: 0.5rem; font-size: 0.85rem;
+    font-family: monospace; word-break: break-all; background: white;
+  }
+  .copy-btn {
+    margin-top: 0.5rem; background: var(--rose); color: white; border: none;
+    padding: 0.5rem 1rem; border-radius: 999px;
+    font-family: 'Caveat', cursive; font-size: 1.1rem; cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--rose-deep); }
+
+  .card {
+    position: relative; background: var(--cream); border-radius: 28px;
+    padding: 3rem 2.5rem; max-width: 620px; width: 100%; text-align: center;
+    box-shadow: 0 20px 60px rgba(233, 78, 119, 0.18), 0 4px 12px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.8);
+    z-index: 1; animation: cardIn 0.9s cubic-bezier(.2,.9,.2,1.05) both;
+  }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(30px) scale(.96); } to { opacity: 1; transform: none; } }
+  .card::before {
+    content: "💕"; position: absolute; top: -22px; left: 50%;
+    transform: translateX(-50%); font-size: 2.5rem;
+    background: var(--cream); padding: 0 0.5rem;
+  }
+  .eyebrow { font-family: 'Caveat', cursive; color: var(--rose); font-size: 1.5rem; letter-spacing: 0.05em; margin-bottom: 0.5rem; animation: fadeUp 0.8s 0.2s both; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: clamp(1.9rem, 5.5vw, 2.8rem); line-height: 1.2; margin-bottom: 1rem; animation: fadeUp 0.8s 0.35s both; }
+  .sub { font-size: 1.1rem; line-height: 1.6; color: #6b4858; margin-bottom: 1.5rem; animation: fadeUp 0.8s 0.5s both; }
+  .personal-note { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--rose-deep); line-height: 1.4; margin: 1rem 0 1.5rem; padding: 0 0.5rem; animation: fadeUp 0.8s 0.6s both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: none; } }
+
+  .pick-label { font-family: 'Caveat', cursive; color: var(--rose); font-size: 1.4rem; margin: 1rem 0 0.6rem; }
+  .proposals { display: grid; gap: 0.8rem; margin-bottom: 1.5rem; text-align: left; }
+  .proposal {
+    background: white; border: 2px solid #f0d8e0; border-radius: 18px;
+    padding: 1rem 1.2rem; cursor: pointer; position: relative;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, background 0.3s;
+    animation: fadeUp 0.5s both;
+    -webkit-tap-highlight-color: rgba(233, 78, 119, 0.2);
+  }
+  .proposal:hover { transform: translateY(-2px) rotate(-0.4deg); border-color: var(--rose); box-shadow: 0 12px 24px rgba(233, 78, 119, 0.15); }
+  .proposal.selected { background: linear-gradient(135deg, #fff 0%, #fff0f4 100%); border-color: var(--rose); box-shadow: 0 12px 30px rgba(233, 78, 119, 0.25); }
+  .proposal.selected::after {
+    content: "💕"; position: absolute; top: -10px; right: 12px;
+    background: white; padding: 2px 6px; border-radius: 999px;
+    font-size: 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .proposal-title { font-family: 'Caveat', cursive; color: var(--rose-deep); font-size: 1.5rem; font-weight: 700; margin-bottom: 0.4rem; line-height: 1.1; }
+  .proposal-details { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.95rem; color: #6b4858; }
+  .proposal-details span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+  .buttons { display: flex; gap: 1rem; justify-content: center; align-items: center; flex-wrap: wrap; position: relative; min-height: 70px; animation: fadeUp 0.8s 0.65s both; }
+  button.choice { font-family: 'Caveat', cursive; font-size: 1.6rem; font-weight: 700; border: none; padding: 0.9rem 2.4rem; border-radius: 999px; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s; letter-spacing: 0.02em; -webkit-tap-highlight-color: transparent; }
+  #yesBtn {
+    background: linear-gradient(135deg, var(--rose), var(--rose-deep));
+    color: white;
+    box-shadow: 0 8px 20px rgba(233, 78, 119, 0.4), inset 0 -3px 0 rgba(0,0,0,0.1);
+  }
+  #yesBtn:hover:not(:disabled) { transform: translateY(-3px) scale(1.05); box-shadow: 0 12px 28px rgba(233, 78, 119, 0.5); }
+  #yesBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  #yesBtn.pulse:not(:disabled) { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  #noBtn { background: var(--cream); color: var(--ink); border: 2px solid #e8d5dc; position: relative; transition: top 0.25s cubic-bezier(.34,1.56,.64,1), left 0.25s cubic-bezier(.34,1.56,.64,1), transform 0.2s ease; }
+  #noBtn:hover { background: #f8e8ee; }
+  #noBtn.escaping { position: fixed; z-index: 1000; }
+  .hint { margin-top: 1.5rem; font-family: 'Caveat', cursive; color: #a07485; font-size: 1.15rem; min-height: 1.5rem; transition: opacity 0.3s; }
+
+  .success { display: none; text-align: center; animation: cardIn 0.6s cubic-bezier(.2,.9,.2,1.05) both; }
+  .success.show { display: block; }
+  .success h2 { font-family: 'Caveat', cursive; font-size: clamp(2.5rem, 8vw, 4rem); color: var(--rose-deep); margin-bottom: 1rem; line-height: 1; }
+  .success p { font-size: 1.2rem; color: #6b4858; margin-bottom: 1.5rem; line-height: 1.5; }
+  .picked-summary { background: white; border: 2px solid var(--rose); border-radius: 18px; padding: 1.2rem; margin: 1rem auto 1.5rem; max-width: 420px; text-align: left; }
+  .picked-summary .ps-label { font-family: 'Caveat', cursive; color: var(--rose); font-size: 1.2rem; text-align: center; margin-bottom: 0.5rem; }
+  .picked-summary .ps-title { font-family: 'Caveat', cursive; color: var(--rose-deep); font-size: 1.7rem; font-weight: 700; text-align: center; line-height: 1.1; margin-bottom: 0.6rem; }
+  .picked-summary .ps-details { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; justify-content: center; font-size: 1rem; color: #6b4858; }
+
+  .confirm-block {
+    background: linear-gradient(135deg, #fff8f3 0%, #fff0f4 100%);
+    border: 2px dashed var(--rose);
+    border-radius: 18px;
+    padding: 1.3rem 1rem;
+    margin: 0 auto 1.5rem;
+    max-width: 420px;
+  }
+  .confirm-block h3 { font-family: 'Caveat', cursive; color: var(--rose-deep); font-size: 1.5rem; margin-bottom: 0.3rem; }
+  .confirm-block p { font-size: 1rem; color: #6b4858; margin-bottom: 1rem; line-height: 1.4; }
+  .confirm-btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: linear-gradient(135deg, var(--rose), var(--rose-deep));
+    color: white; text-decoration: none; border: none;
+    padding: 0.8rem 1.6rem; border-radius: 999px;
+    font-family: 'Caveat', cursive; font-size: 1.4rem; font-weight: 700;
+    cursor: pointer; box-shadow: 0 8px 20px rgba(233, 78, 119, 0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .confirm-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(233, 78, 119, 0.45); }
+  .confirm-sent { margin-top: 0.8rem; font-family: 'Caveat', cursive; color: #6b8e5a; font-size: 1.2rem; display: none; }
+  .confirm-sent.show { display: block; }
+
+  .gif-wrapper { border-radius: 18px; overflow: hidden; margin: 1.5rem auto; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); aspect-ratio: 1/1; background: #f0d8e0; }
+  .gif-wrapper img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .reactions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed #e8c4cf; }
+  .reactions-label { font-family: 'Caveat', cursive; color: var(--rose); font-size: 1.3rem; margin-bottom: 0.8rem; }
+  .reaction-row { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+  .reaction-btn { background: white; border: 2px solid #f0d8e0; border-radius: 999px; padding: 0.4rem 0.9rem; font-size: 1.4rem; cursor: pointer; transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease; font-family: inherit; line-height: 1; }
+  .reaction-btn:hover { transform: scale(1.2) rotate(-8deg); background: var(--bg-1); border-color: var(--rose); }
+  .reaction-btn.picked { background: var(--rose); border-color: var(--rose); transform: scale(1.15); }
+  .reaction-feedback { margin-top: 1rem; font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--rose-deep); min-height: 1.6rem; }
+  .confetti { position: fixed; width: 10px; height: 14px; top: -20px; z-index: 9999; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0.7; } }
+  .edit-link { position: fixed; top: 1rem; right: 1rem; background: rgba(255,255,255,0.8); backdrop-filter: blur(8px); border: 1px solid #f0d8e0; border-radius: 999px; padding: 0.4rem 0.9rem; font-family: 'Caveat', cursive; color: var(--rose-deep); font-size: 1rem; cursor: pointer; z-index: 10; transition: background 0.2s; }
+  .edit-link:hover { background: white; }
+
+  @media (max-width: 520px) {
+    .card, .editor { padding: 2.2rem 1.3rem; }
+    button.choice { font-size: 1.4rem; padding: 0.8rem 1.8rem; }
+    #noBtn.escaping { padding: 0.7rem 1.4rem; font-size: 1.2rem; }
+    .pe-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Splash-Screen (nur beim ersten Laden sichtbar) -->
+<div id="splash">
+  <div class="splash-heart">💌</div>
+  <div class="splash-name">DateMe</div>
+</div>
+
+<!-- iPhone-Installations-Banner -->
+<div id="installBanner">
+  <strong>📱 DateMe als App speichern?</strong>
+  <p>So bekommst du DateMe als eigene App auf deinen Homescreen:</p>
+  <div class="install-steps">
+    1. Tippe unten in Safari auf das <strong>Teilen-Symbol</strong> (Quadrat mit Pfeil ↑)<br>
+    2. Scrolle und wähle <strong>„Zum Home-Bildschirm"</strong><br>
+    3. Tippe rechts oben auf <strong>„Hinzufügen"</strong> — fertig! 💕
+  </div>
+  <button class="install-close" onclick="dismissInstall()">Verstanden</button>
+</div>
+
+<!-- Hintergrund-Deko -->
+<div class="floating-heart" style="top:10%; left:8%; animation-delay:0s;">💖</div>
+<div class="floating-heart" style="top:25%; right:10%; animation-delay:1.5s;">✨</div>
+<div class="floating-heart" style="bottom:15%; left:12%; animation-delay:3s;">🌸</div>
+<div class="floating-heart" style="bottom:25%; right:8%; animation-delay:4.5s;">💕</div>
+<div class="floating-heart" style="top:50%; left:5%; animation-delay:2s;">🦋</div>
+
+
+<!-- EDITOR -->
+<div class="editor" id="editor" style="display:none;">
+  <h2>Plane dein Date 💌</h2>
+  <p class="editor-sub">Mach mehrere Vorschläge — sie sucht sich den schönsten aus.</p>
+
+  <div class="field"><label for="f_name">Wie soll sie angesprochen werden?</label>
+    <input type="text" id="f_name" placeholder="z.B. Liebste / ihr Name / Schatz"></div>
+
+  <div class="field"><label for="f_question">Deine Hauptfrage</label>
+    <input type="text" id="f_question" value="Willst du mit mir auf ein Date?"></div>
+
+  <div class="field"><label for="f_note">Persönliche Nachricht (optional)</label>
+    <textarea id="f_note" rows="2" placeholder="z.B. Ich hab da ein paar Ideen — such dir aus, was dir am besten gefällt 💕"></textarea></div>
+
+  <div class="section-title">Deine Vorschläge 📅</div>
+  <p class="section-hint">Füge so viele hinzu, wie du möchtest. Sie kann später einen antippen.</p>
+
+  <div id="proposalsList"></div>
+
+  <button class="add-proposal" onclick="addProposal()">+ Vorschlag hinzufügen</button>
+
+  <div class="section-title">Bestätigung an dich ✉️</div>
+  <p class="section-hint">Trag deine E-Mail ein — nach ihrem Ja kann sie mit einem Klick eine fertige Mail an dich öffnen.</p>
+
+  <div class="field"><label for="f_email">Deine E-Mail-Adresse</label>
+    <input type="email" id="f_email" placeholder="z.B. max@example.com">
+    <div class="field-hint">Erscheint nur in der vorbereiteten Mail — sie wird nirgendwo gespeichert.</div>
+  </div>
+
+  <div class="field" style="margin-top: 1.8rem;"><label for="f_sig">Von wem? (Unterschrift)</label>
+    <input type="text" id="f_sig" placeholder="z.B. Dein Max"></div>
+
+  <div class="editor-actions">
+    <button class="btn-secondary" onclick="loadPreview()">Vorschau ansehen</button>
+    <button class="btn-primary" onclick="generateLink()">Link erzeugen 💌</button>
+  </div>
+
+  <div class="link-box" id="linkBox">
+    <p>Hier ist dein persönlicher Einladungs-Link — kopier ihn und schick ihn ihr:</p>
+    <textarea id="linkOutput" readonly></textarea>
+    <button class="copy-btn" onclick="copyLink(event)">Link kopieren</button>
+    <button class="copy-btn" style="background: var(--rose-deep); margin-left: 0.4rem;" onclick="openLink()">Direkt öffnen</button>
+  </div>
+</div>
+
+<div class="edit-link" id="editLink" style="display:none;" onclick="backToEditor()">✎ bearbeiten</div>
+
+<div class="card" id="card" style="display:none;">
+  <div id="questionView">
+    <div class="eyebrow">Eine kleine Frage…</div>
+    <p class="sub" id="greeting" style="display:none;"></p>
+    <h1 id="questionText">Willst du mit mir auf ein <em style="color:var(--rose-deep); font-family:'Caveat',cursive; font-size:1.2em; font-style:italic;">Date</em>?</h1>
+
+    <p class="personal-note" id="personalNote" style="display:none;"></p>
+
+    <div id="proposalsSection">
+      <div class="pick-label">Such dir aus, was dir am besten gefällt 💕</div>
+      <div class="proposals" id="proposalsView"></div>
+    </div>
+
+    <div class="buttons">
+      <button id="yesBtn" class="choice pulse" disabled onclick="sayYes()">Ja, gerne! 💖</button>
+      <button id="noBtn" class="choice"
+              onmouseover="escapeNo(event)"
+              onmousemove="escapeNo(event)"
+              ontouchstart="escapeNo(event)"
+              onclick="return false;">Nein</button>
+    </div>
+
+    <div class="hint" id="hint">&nbsp;</div>
+
+    <p class="sub" id="signatureText" style="margin-top:1.5rem; display:none; font-style:italic;"></p>
+  </div>
+
+  <div class="success" id="success">
+    <h2>Yay! 🎉</h2>
+    <p id="successText">Wusst' ich's doch.<br>Ich freu mich schon riesig auf dich. 💕</p>
+
+    <div class="picked-summary" id="pickedSummary" style="display:none;">
+      <div class="ps-label">Du hast gewählt:</div>
+      <div class="ps-title" id="ps-title"></div>
+      <div class="ps-details" id="ps-details"></div>
+    </div>
+
+    <div class="confirm-block" id="confirmBlock" style="display:none;">
+      <h3>Schick mir noch kurz Bescheid 💌</h3>
+      <p>Tipp auf den Button — deine Mail-App öffnet sich mit einer fertigen Nachricht. Du musst nur noch auf Senden tippen.</p>
+      <a href="#" class="confirm-btn" id="confirmBtn" onclick="sendConfirmation(event)">✉️ Bestätigung senden</a>
+      <div class="confirm-sent" id="confirmSent">Mail geöffnet — drück nur noch auf Senden ✓</div>
+    </div>
+
+    <div class="gif-wrapper">
+      <img id="celebrationGif" src="https://media.giphy.com/media/3oz8xAFtqoOUUrsh7W/giphy.gif" alt="Freudentanz">
+    </div>
+
+    <div class="reactions">
+      <div class="reactions-label">Wie fühlst du dich gerade? 💭</div>
+      <div class="reaction-row" id="reactionRow">
+        <button class="reaction-btn" data-r="😍" data-msg="Aww, gleichfalls 💕">😍</button>
+        <button class="reaction-btn" data-r="🥰" data-msg="Du machst mich verlegen 😊">🥰</button>
+        <button class="reaction-btn" data-r="🤭" data-msg="Heimlich gefreut? Verstehe 😉">🤭</button>
+        <button class="reaction-btn" data-r="🎉" data-msg="Party-Modus aktiviert! 🥳">🎉</button>
+        <button class="reaction-btn" data-r="🫶" data-msg="Zurück an dich 🫶">🫶</button>
+        <button class="reaction-btn" data-r="😎" data-msg="Sehr cool. Ich auch. 😎">😎</button>
+      </div>
+      <div class="reaction-feedback" id="reactionFeedback">&nbsp;</div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* =========================================================
+   SERVICE WORKER REGISTRIEREN (PWA)
+   ========================================================= */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('Service Worker registriert:', reg.scope))
+      .catch(err => console.log('Service Worker fehlgeschlagen:', err));
+  });
+}
+
+/* =========================================================
+   iPhone-Installations-Hinweis (nur einmal)
+   ========================================================= */
+function isIos() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent);
+}
+function isStandalone() {
+  return ('standalone' in window.navigator && window.navigator.standalone) ||
+         window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function dismissInstall() {
+  document.getElementById('installBanner').classList.remove('show');
+  localStorage.setItem('installDismissed', '1');
+}
+
+// Banner anzeigen: nur auf iOS, nicht in App-Modus, nicht bei Einladungs-Aufruf, nicht schon abgewiesen
+setTimeout(() => {
+  if (isIos() && !isStandalone() && !localStorage.getItem('installDismissed') && !hasInvite) {
+    document.getElementById('installBanner').classList.add('show');
+  }
+}, 2000);
+
+/* =========================================================
+   UTF-8 BASE64 (robust, mit Umlauten/Emojis)
+   ========================================================= */
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function base64ToUtf8(str) {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+function encodeInvite(data) {
+  const json = JSON.stringify(data);
+  const b64 = utf8ToBase64(json);
+  return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function decodeInvite(str) {
+  try {
+    let b64 = str.replace(/-/g,'+').replace(/_/g,'/');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(base64ToUtf8(b64));
+  } catch (e) {
+    console.error('decodeInvite failed:', e);
+    return null;
+  }
+}
+
+/* =========================================================
+   MODUS BESTIMMEN
+   ========================================================= */
+const params = new URLSearchParams(window.location.search);
+const hasInvite = params.has('d');
+let inviteData = {};
+
+if (hasInvite) {
+  const decoded = decodeInvite(params.get('d'));
+  if (decoded) {
+    inviteData = decoded;
+    showInvitation(inviteData);
+  } else {
+    document.getElementById('editor').style.display = 'block';
+    addStarterProposals();
+    alert('Der Einladungs-Link konnte nicht gelesen werden. Bitte erzeuge einen neuen.');
+  }
+} else {
+  document.getElementById('editor').style.display = 'block';
+  const saved = localStorage.getItem('dateDraft');
+  if (saved) {
+    try { fillForm(JSON.parse(saved)); }
+    catch(e) { addStarterProposals(); }
+  } else {
+    addStarterProposals();
+  }
+}
+
+/* ===== Formular ===== */
+function v(id) { return document.getElementById(id).value.trim(); }
+function setV(id, val) { document.getElementById(id).value = val || ''; }
+
+function addStarterProposals() { addProposal(); addProposal(); }
+
+function addProposal(data) {
+  data = data || {};
+  const list = document.getElementById('proposalsList');
+  const idx = list.children.length;
+  const div = document.createElement('div');
+  div.className = 'proposal-edit';
+  div.innerHTML =
+    '<div class="pe-head">' +
+      '<span class="pe-num">Vorschlag ' + (idx + 1) + '</span>' +
+      '<button class="pe-remove" title="Entfernen" onclick="removeProposal(this)">✕</button>' +
+    '</div>' +
+    '<div class="pe-grid">' +
+      '<input type="text" class="wide" data-k="a" placeholder="🎯 Was? z.B. Italiener, Kino, Spaziergang" value="' + esc(data.a) + '">' +
+      '<input type="text" class="wide" data-k="p" placeholder="📍 Wo? z.B. Altstadt Heidelberg" value="' + esc(data.p) + '">' +
+      '<input type="text" data-k="d" placeholder="📅 Wann? z.B. Sa, 30. Mai" value="' + esc(data.d) + '">' +
+      '<input type="text" data-k="t" placeholder="🕒 Uhrzeit z.B. 19:00" value="' + esc(data.t) + '">' +
+    '</div>';
+  list.appendChild(div);
+}
+
+function removeProposal(btn) { btn.closest('.proposal-edit').remove(); renumberProposals(); }
+
+function renumberProposals() {
+  const list = document.getElementById('proposalsList');
+  [...list.children].forEach((el, i) => {
+    el.querySelector('.pe-num').textContent = 'Vorschlag ' + (i + 1);
+  });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function readProposals() {
+  const list = document.getElementById('proposalsList');
+  const result = [];
+  [...list.children].forEach(card => {
+    const obj = {};
+    card.querySelectorAll('input[data-k]').forEach(inp => {
+      const val = inp.value.trim();
+      if (val) obj[inp.dataset.k] = val;
+    });
+    if (Object.keys(obj).length) result.push(obj);
+  });
+  return result;
+}
+
+function readForm() {
+  return { n:v('f_name'), q:v('f_question'), m:v('f_note'), s:v('f_sig'), e:v('f_email'), pr:readProposals() };
+}
+
+function fillForm(data) {
+  setV('f_name', data.n); setV('f_question', data.q || 'Willst du mit mir auf ein Date?');
+  setV('f_note', data.m); setV('f_sig', data.s); setV('f_email', data.e);
+  document.getElementById('proposalsList').innerHTML = '';
+  if (data.pr && data.pr.length) data.pr.forEach(p => addProposal(p));
+  else addStarterProposals();
+}
+
+function loadPreview() {
+  const data = readForm();
+  localStorage.setItem('dateDraft', JSON.stringify(data));
+  inviteData = data;
+  document.getElementById('editor').style.display = 'none';
+  document.getElementById('card').style.display = 'block';
+  document.getElementById('editLink').style.display = 'block';
+  showInvitation(data);
+}
+
+function backToEditor() {
+  document.getElementById('editor').style.display = 'block';
+  document.getElementById('card').style.display = 'none';
+  document.getElementById('editLink').style.display = 'none';
+  document.getElementById('questionView').style.display = 'block';
+  document.getElementById('success').classList.remove('show');
+  document.getElementById('confirmSent').classList.remove('show');
+  noBtn.classList.remove('escaping');
+  noBtn.style.cssText = '';
+  yesBtn.style.transform = '';
+  document.getElementById('hint').textContent = '\u00A0';
+  escapeCount = 0;
+  selectedProposalIdx = -1;
+}
+
+function generateLink() {
+  const data = readForm();
+  localStorage.setItem('dateDraft', JSON.stringify(data));
+  const encoded = encodeInvite(data);
+  const base = window.location.href.split('?')[0].split('#')[0];
+  document.getElementById('linkOutput').value = base + '?d=' + encoded;
+  document.getElementById('linkBox').classList.add('show');
+}
+
+function copyLink(ev) {
+  const el = document.getElementById('linkOutput');
+  el.select();
+  try { navigator.clipboard.writeText(el.value); } catch(e) { document.execCommand('copy'); }
+  const btn = ev.target;
+  const old = btn.textContent;
+  btn.textContent = 'Kopiert! ✓';
+  setTimeout(() => btn.textContent = old, 1800);
+}
+
+function openLink() {
+  const url = document.getElementById('linkOutput').value;
+  if (url) window.open(url, '_blank');
+}
+
+/* ===== Einladung darstellen ===== */
+let currentProposals = [];
+let selectedProposalIdx = -1;
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showInvitation(data) {
+  document.getElementById('editor').style.display = 'none';
+  document.getElementById('card').style.display = 'block';
+
+  if (data.n) {
+    const greet = document.getElementById('greeting');
+    greet.textContent = 'Liebe ' + data.n + ',';
+    greet.style.display = 'block';
+  }
+
+  if (data.q) {
+    let q = escapeHtml(data.q);
+    q = q.replace(/(date)/i, '<em style="color:var(--rose-deep); font-family:\'Caveat\',cursive; font-size:1.2em; font-style:italic;">$1</em>');
+    document.getElementById('questionText').innerHTML = q;
+  }
+
+  if (data.m) {
+    const note = document.getElementById('personalNote');
+    note.textContent = '\u201E' + data.m + '\u201C';
+    note.style.display = 'block';
+  }
+
+  currentProposals = (data.pr || []).filter(p => p && Object.keys(p).length);
+  renderProposals();
+
+  if (data.s) {
+    const sig = document.getElementById('signatureText');
+    sig.textContent = '\u2014 ' + data.s;
+    sig.style.display = 'block';
+  }
+
+  updateYesButton();
+}
+
+function renderProposals() {
+  const wrap = document.getElementById('proposalsView');
+  const section = document.getElementById('proposalsSection');
+  wrap.innerHTML = '';
+
+  if (!currentProposals.length) {
+    section.style.display = 'none';
+    document.getElementById('yesBtn').disabled = false;
+    document.getElementById('yesBtn').classList.add('pulse');
+    return;
+  }
+  section.style.display = 'block';
+
+  currentProposals.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'proposal' + (selectedProposalIdx === i ? ' selected' : '');
+    card.style.animationDelay = (0.7 + i * 0.08) + 's';
+    card.onclick = () => pickProposal(i);
+
+    const title = p.a || p.p || 'Idee ' + (i + 1);
+    let detailsHtml = '';
+    if (p.d) detailsHtml += '<span>📅 ' + escapeHtml(p.d) + '</span>';
+    if (p.t) detailsHtml += '<span>🕒 ' + escapeHtml(p.t) + '</span>';
+    if (p.p && title !== p.p) detailsHtml += '<span>📍 ' + escapeHtml(p.p) + '</span>';
+
+    card.innerHTML =
+      '<div class="proposal-title">' + escapeHtml(title) + '</div>' +
+      (detailsHtml ? '<div class="proposal-details">' + detailsHtml + '</div>' : '');
+    wrap.appendChild(card);
+  });
+}
+
+function pickProposal(i) { selectedProposalIdx = i; renderProposals(); updateYesButton(); }
+
+function updateYesButton() {
+  const btn = document.getElementById('yesBtn');
+  if (currentProposals.length > 0 && selectedProposalIdx < 0) {
+    btn.disabled = true; btn.classList.remove('pulse');
+  } else {
+    btn.disabled = false; btn.classList.add('pulse');
+  }
+}
+
+/* ===== Nein flieht ===== */
+const noBtn  = document.getElementById('noBtn');
+const hint   = document.getElementById('hint');
+const yesBtn = document.getElementById('yesBtn');
+let escapeCount = 0;
+
+const allMessages = [
+  "Hmm… nochmal versuchen 😏","Der Button ist wohl scheu…","Bist du sicher? Wirklich? 🤔",
+  "Okay, der hat keine Lust auf 'Nein' 💁","Tipp: das andere Knöpfchen ist viel netter 💖",
+  "Du gibst nicht auf, oder? Ich auch nicht 😄","Ich glaube, das Universum will 'Ja' 🌟",
+  "Spoiler: er lässt sich nicht erwischen 🏃💨","Versuch's ruhig weiter — aussichtslos 😜",
+  "Der Button macht gerade Sport 🏋️","Vielleicht ist 'Ja' einfach die bessere Wahl?",
+  "Nope. Der Button hat Prinzipien.","Wow, dein Klick-Game ist stark 💪",
+  "Aber das Nein-Game ist stärker 😎","Er versteckt sich in einer anderen Dimension 🌀",
+  "Spaß beiseite: sag einfach Ja 💕","Du hast vom Schicksal gehört? Es ruft 'Ja' 📞",
+  "Der Button hat heute Urlaub.","Knapp daneben ist auch vorbei…",
+  "Mein Code gegen Neins: 100% Erfolgsquote 🛠️","Du klickst gut. Aber er ist besser. 🥋",
+  "Bitte… ich hab so viel geplant 🥺","Ein Ja würde meinen Tag retten 🌈",
+  "Schon Plan B für ein Ja parat? 😉","Der Nein-Button hat Liebeskummer.",
+  "Versuch's mit dem rosa Knopf 🌸","Olympia 2028: Nein-Button-Weitsprung 🏅",
+  "Achtung: dieser Button beißt nicht — er flieht.","Tipp Nr. 47: einfach Ja 💌",
+  "Er ist wie ein Ninja 🥷","Du machst das toll. Aber Ja wäre toller.",
+  "Glück hat, wer ihn fängt.","Statistik: 0% Erfolg beim Nein-Klick 📊",
+  "Der Button hat Angst vor Ablehnung 🙈","Komm schon… ein Ja kostet doch nichts.",
+  "Du bist sehr ausdauernd. Ich auch.","Hier spricht der Button: Bitte hör auf 😅",
+  "Vielleicht beim 100. Versuch? Eher nicht.","Der Button und ich haben einen Pakt.",
+  "Auch dieser Klick: vergebens 🌹"
+];
+let messageQueue = [];
+function nextMessage() {
+  if (messageQueue.length === 0) messageQueue = [...allMessages].sort(() => Math.random() - 0.5);
+  return messageQueue.pop();
+}
+
+function escapeNo(e) {
+  if (!noBtn.classList.contains('escaping')) {
+    const rect = noBtn.getBoundingClientRect();
+    noBtn.style.top  = rect.top  + 'px';
+    noBtn.style.left = rect.left + 'px';
+    noBtn.classList.add('escaping');
+  }
+  const btnW = noBtn.offsetWidth; const btnH = noBtn.offsetHeight;
+  const pad = 12;
+  const maxX = window.innerWidth - btnW - pad;
+  const maxY = window.innerHeight - btnH - pad;
+  let newX, newY, tries = 0;
+  const curX = parseFloat(noBtn.style.left) || 0;
+  const curY = parseFloat(noBtn.style.top)  || 0;
+  do {
+    newX = Math.random() * maxX + pad/2;
+    newY = Math.random() * maxY + pad/2;
+    tries++;
+  } while (Math.hypot(newX - curX, newY - curY) < 200 && tries < 10);
+  noBtn.style.left = newX + 'px';
+  noBtn.style.top  = newY + 'px';
+  noBtn.style.transform = 'rotate(' + (Math.random()*30 - 15).toFixed(1) + 'deg)';
+  hint.textContent = nextMessage();
+  escapeCount++;
+  if (escapeCount >= 3 && !yesBtn.disabled) {
+    yesBtn.style.transform = 'scale(' + (1 + Math.min(escapeCount * 0.025, 0.4)) + ')';
+  }
+}
+
+/* ===== Ja → Erfolg ===== */
+function sayYes() {
+  if (yesBtn.disabled) return;
+  let pickedSummary = '';
+  if (selectedProposalIdx >= 0 && currentProposals[selectedProposalIdx]) {
+    const p = currentProposals[selectedProposalIdx];
+    document.getElementById('pickedSummary').style.display = 'block';
+    const title = p.a || p.p || 'Unser Date';
+    document.getElementById('ps-title').textContent = title;
+    const det = document.getElementById('ps-details');
+    det.innerHTML = '';
+    pickedSummary = title;
+    if (p.d) { det.innerHTML += '<span>📅 ' + escapeHtml(p.d) + '</span>'; pickedSummary += '\n📅 ' + p.d; }
+    if (p.t) { det.innerHTML += '<span>🕒 ' + escapeHtml(p.t) + '</span>'; pickedSummary += '\n🕒 ' + p.t; }
+    if (p.p && p.a) { det.innerHTML += '<span>📍 ' + escapeHtml(p.p) + '</span>'; pickedSummary += '\n📍 ' + p.p; }
+  }
+  if (inviteData.e) {
+    prepareConfirmation(pickedSummary);
+    document.getElementById('confirmBlock').style.display = 'block';
+  }
+  document.getElementById('questionView').style.display = 'none';
+  document.getElementById('success').classList.add('show');
+  launchConfetti();
+}
+
+function prepareConfirmation(pickedSummary) {
+  const email = inviteData.e;
+  const herName = inviteData.n || '';
+  const subject = 'Ich sag JA! 💕';
+  let body = 'Hey ' + (inviteData.s ? inviteData.s.replace(/^(dein|deine)\s+/i, '') : '') + ',\n\n';
+  body += 'ich habe gerade auf deine Einladung geantwortet —\n';
+  body += 'und natürlich sag ich JA! 💕\n\n';
+  if (pickedSummary) {
+    body += 'Das hab ich mir ausgesucht:\n' + pickedSummary + '\n\n';
+  }
+  body += 'Ich freu mich schon riesig.\n\n';
+  if (herName) body += 'Deine ' + herName;
+  const mailto = 'mailto:' + encodeURIComponent(email) +
+                 '?subject=' + encodeURIComponent(subject) +
+                 '&body=' + encodeURIComponent(body);
+  document.getElementById('confirmBtn').setAttribute('href', mailto);
+}
+
+function sendConfirmation(ev) {
+  setTimeout(() => { document.getElementById('confirmSent').classList.add('show'); }, 600);
+}
+
+function launchConfetti() {
+  const colors = ['#e94e77','#ffd6e0','#ffeaa7','#a8e6cf','#c9396a','#fff8f3'];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDuration = (2 + Math.random() * 2.5) + 's';
+    c.style.animationDelay = (Math.random() * 0.6) + 's';
+    c.style.transform = 'rotate(' + (Math.random()*360) + 'deg)';
+    if (Math.random() > 0.5) c.style.borderRadius = '50%';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 5000);
+  }
+}
+
+const feedback = document.getElementById('reactionFeedback');
+document.querySelectorAll('.reaction-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.reaction-btn').forEach(b => b.classList.remove('picked'));
+    btn.classList.add('picked');
+    feedback.textContent = btn.dataset.msg;
+    burstEmoji(btn, btn.dataset.r);
+  });
+});
+
+function burstEmoji(originEl, emoji) {
+  const rect = originEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < 8; i++) {
+    const e = document.createElement('div');
+    e.textContent = emoji;
+    e.style.cssText = 'position:fixed; left:' + cx + 'px; top:' + cy + 'px; font-size:1.5rem; pointer-events:none; z-index:9999; transition:transform 0.9s ease-out, opacity 0.9s ease-out;';
+    document.body.appendChild(e);
+    requestAnimationFrame(() => {
+      const angle = (Math.PI * 2 * i) / 8;
+      const dist = 60 + Math.random() * 60;
+      e.style.transform = 'translate(' + (Math.cos(angle)*dist) + 'px, ' + (Math.sin(angle)*dist - 40) + 'px) scale(0.5)';
+      e.style.opacity = '0';
+    });
+    setTimeout(() => e.remove(), 1000);
+  }
+}
+</script>
+
+</body>
+</html>
